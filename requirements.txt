@@ -1,7 +1,7 @@
-demoji
-pandas
-telethon
-cryptg
-tqdm
-urllib3==1.26.6
+cryptg>=0.3.1
+demoji>=1.1.0
+pandas>=2.0.0
+python-socks>=2.4.4
+telethon>=1.34.0
+tqdm>=4.66.0
 

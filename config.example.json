@@ -2,5 +2,8 @@
   "api_id": 12345678,
   "api_hash": "123456781234567812345678",
   "save_path": "/home/teledown/",
-  "proxy_port": 7890
+  "phone": "+8613711111111",
+  "bot_token": null,
+  "alias": {},
+  "proxy": "127.0.0.1:7890"
 }

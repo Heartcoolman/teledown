@@ -1,13 +1,13 @@
 import os
 import sys
 from asyncio import CancelledError
-from datetime import datetime
+from typing import Optional
 
 from telethon import TelegramClient
 from telethon.errors import FileReferenceExpiredError
 from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
 
-from tools.tool import GetFileName, getHistoryMessage, GetChatId, match_wildcard
+from tools.tool import GetChatId, GetFileName, getHistoryMessage, match_wildcard
 from tools.tqdm import TqdmUpTo
 
 
@@ -36,14 +36,22 @@ def GetFileSuffix(message) -> list:
     return mime_type.split('/')
 
 
-async def download_file(client: TelegramClient, channel_title, channel_id, message, prefix, old=False):
-    message_time = message.date
-    formatted_time = datetime.strftime(message_time, '%Y_%m')
-
+async def download_file(
+    client: TelegramClient,
+    channel_title,
+    channel_id,
+    message,
+    prefix: Optional[str] = None,
+    old: bool = False,
+):
     file_name = GetFileName(message)
     if not match_wildcard(prefix, file_name):
         return
+    if message.file is None:
+        print('未识别的媒体类型，跳过该消息')
+        return
     file_path = os.path.join(os.environ["save_path"], f'{channel_title}-{channel_id}', file_name)
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     file_size = message.file.size
     ret, file_path = fileExist(file_path, file_size)
     if not ret:
@@ -76,7 +84,7 @@ async def download_file(client: TelegramClient, channel_title, channel_id, messa
         print(f"媒体已存在：{file_path}")
 
 
-async def down_group(client: TelegramClient, chat_id, plus_func: str, from_user, prefix):
+async def down_group(client: TelegramClient, chat_id, plus_func: str, from_user, prefix: Optional[str]):
     chat_id = await GetChatId(client, chat_id)
     channel_title, messages = await getHistoryMessage(client, chat_id, plus_func, from_user=from_user)  # messages是倒序的
     async for message in messages:

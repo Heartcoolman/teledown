@@ -5,7 +5,7 @@ import re
 import subprocess
 import sys
 from io import BytesIO
-from typing import Union
+from typing import Optional, Union
 
 import demoji
 import pandas as pd
@@ -22,26 +22,30 @@ def shorten_filename(filename, limit=50):
         return filename[:int(limit / 2) - 3] + '...' + filename[len(filename) - int(limit / 2):]
 
 
-def print_all_channel(client: TelegramClient):
-    Ids = []
-    Names = []
-    # Types = []
-    for d in client.iter_dialogs():
-        if not isinstance(d.entity, types.Channel):
-            continue
-        Ids.append(d.entity.id)
-        Names.append(d.name)
-        # Types.append(d.entity)
+async def print_all_channel(client: TelegramClient) -> None:
+    ids: list[int] = []
+    names: list[str] = []
 
-    df = pd.DataFrame({'ID': Ids, '频道名': Names})
+    async for dialog in client.iter_dialogs():
+        if not isinstance(dialog.entity, types.Channel):
+            continue
+        ids.append(dialog.entity.id)
+        names.append(dialog.name)
+
+    df = pd.DataFrame({'ID': ids, '频道名': names})
     df.sort_values("频道名", inplace=True)
     df.to_csv('全部频道.csv', index=False)
     print('全部输出完成')
 
 
-async def getHistoryMessage(client: TelegramClient, chat_id: int, plus_func=Union[None, str], from_user=None):
+async def getHistoryMessage(
+    client: TelegramClient,
+    chat_id: int,
+    plus_func: Optional[str] = None,
+    from_user: Optional[Union[str, int]] = None,
+):
     channel_title = await GetChatTitle(client, chat_id)
-    if from_user is not None and from_user.isdecimal():
+    if isinstance(from_user, str) and from_user.isdecimal():
         from_user = int(from_user)
     # Todo 根据plus_func获取指定消息区间
     if plus_func is not None:
