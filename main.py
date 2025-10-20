@@ -1,13 +1,15 @@
 import argparse
+import asyncio
 import json
 import os
 import sys
+from typing import Iterable
 
 from telethon import TelegramClient
 
 from tools.down_file import down_group
 from tools.monit import StartMonit
-from tools.tool import print_all_channel, Hook, print_group, initDb, md5
+from tools.tool import Hook, initDb, md5, print_all_channel, print_group
 from tools.upload_file import upload_file
 
 # 1.创建解释器
@@ -53,6 +55,8 @@ if alias:
 initDb(md5Token)
 os.environ['save_path'] = save_path = config.get('save_path')
 proxy = config.get('proxy')
+if proxy is None and config.get('proxy_port') is not None:
+    proxy = f"127.0.0.1:{config['proxy_port']}"
 if args.proxy is not None:
     proxy = args.proxy
 if proxy is not None:
@@ -95,40 +99,62 @@ def show_my_inf(me):
     print("-----login successful-----")
 
 
-async def client_main():
+async def client_main() -> None:
     print("-client-main-")
     me = await client.get_me()
     show_my_inf(me)
 
 
-if __name__ == '__main__':
+async def run() -> int:
     # 除了刷新缓存，都需要频道ID
     if not args.refresh and args.id is None:
-        sys.exit(1)
+        print('缺失频道ID')
+        return 1
     if args.upload and args.path is None:
         print('缺失上传路径')
-        sys.exit(1)
-    with client.start(phone=phone, bot_token=bot_token):
-        client.loop.run_until_complete(client_main())
-        client.loop.run_until_complete(Hook(client))
+        return 1
+
+    await client.start(phone=phone, bot_token=bot_token)
+    try:
+        await client_main()
+        await Hook(client)
+
         if args.refresh:
-            print_all_channel(client=client)
+            await print_all_channel(client=client)
         if args.download:
             if 't.me' in args.id:
-                tmpList = args.id.split('/')
-                channel_id = tmpList[-2]
-                plus_func = '=' + tmpList[-1]
+                tmp_list = args.id.split('/')
+                channel_id = tmp_list[-2]
+                plus_func = '=' + tmp_list[-1]
             else:
                 channel_id = args.id
                 plus_func = args.range
-            for _id in channel_id.split('|'):
-                client.loop.run_until_complete(down_group(client, _id, plus_func, args.user,args.prefix))
+            for _id in _split_items(channel_id, '|'):
+                await down_group(client, _id, plus_func, args.user, args.prefix)
         elif args.upload:
-            del_after_upload = True if args.dau.upper() == 'Y' else False
-            client.loop.run_until_complete(upload_file(client, args.id, args.path, del_after_upload, args.addtag))
+            del_after_upload = args.dau.upper() == 'Y'
+            await upload_file(client, args.id, args.path, del_after_upload, args.addtag)
         elif args.print:
-            client.loop.run_until_complete(print_group(client, args.id))
+            await print_group(client, args.id)
         elif args.monit:
-            channel_ids = args.id.split(',')
-            client.loop.run_until_complete(StartMonit(client, channel_ids))
-            client.run_until_disconnected()
+            channel_ids = list(_split_items(args.id, ','))
+            if not channel_ids:
+                print('缺失监控频道ID')
+                return 1
+            await StartMonit(client, channel_ids, prefix=args.prefix)
+            print('监控已启动，按 Ctrl+C 结束')
+            await client.disconnected
+    finally:
+        await client.disconnect()
+    return 0
+
+
+def _split_items(text: str, delimiter: str) -> Iterable[str]:
+    for item in text.split(delimiter):
+        stripped = item.strip()
+        if stripped:
+            yield stripped
+
+
+if __name__ == '__main__':
+    sys.exit(asyncio.run(run()))
